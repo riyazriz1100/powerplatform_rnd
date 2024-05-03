@@ -1,4 +1,4 @@
-name: export-solution-on-main
+name: export-and-branch-solution
 # Export solution from DEV environment
 #  unpack it and prepare, commit and push a git branch with the changes
 
@@ -14,31 +14,32 @@ on:
       solution_exported_folder:
         description: 'folder name for staging the exported solution *do not change*'
         required: true
-        default: /out
+        default: out/exported/
       solution_folder:
         description: 'staging the unpacked solution folder before check-in *do not change*'
         required: true
-        default: /solution
-      solution_target_folder: 
+        default: out/solutions/
+      solution_target_folder:
        description: 'folder name to be created and checked in *do not change*'
        required: true
-       default: solution
+       default: solutions/
+
 env:
 #edit your values here
-  ENVIRONMENT_URL: 'https://org8dfef31b.crm8.dynamics.com'
-  CLIENT_ID: 'f7ec8dce-5907-4bdf-8a37-2b476ffe64e5'
-  TENANT_ID: '1ae262d5-e55d-e7a7-a1cf-456f22ea4ad1'
+  ENVIRONMENT_URL: https://org8dfef31b.crm8.dynamics.com
+  USERNAME: ahammad.riyaz@botmantra.com
+
 permissions:
   contents: write
+
 jobs:
   export-from-dev:
     runs-on: windows-latest
-    # or you can say runs-on: ubuntu-latest
     env:
       RUNNER_DEBUG: 1
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v2
       with:
         lfs: true
 
@@ -46,21 +47,18 @@ jobs:
       uses: microsoft/powerplatform-actions/who-am-i@v0
       with:
         environment-url: ${{env.ENVIRONMENT_URL}}
-        app-id: ${{env.CLIENT_ID}}
-        client-secret: ${{ secrets.PowerPlatformSPN }}
-        tenant-id: ${{env.TENANT_ID}}
-        
-    
+        user-name: ${{env.USERNAME}}
+        password-secret: ${{ secrets.password }}
 
     - name: export-solution action
       uses: microsoft/powerplatform-actions/export-solution@v0
       with:
         environment-url: ${{env.ENVIRONMENT_URL}}
-        app-id: ${{env.CLIENT_ID}}
-        client-secret: ${{ secrets.PowerPlatformSPN }}
-        tenant-id: ${{env.TENANT_ID}}
+        user-name: ${{env.USERNAME}}
+        password-secret: ${{ secrets.password }}
         solution-name: ${{ github.event.inputs.solution_name }}
         solution-output-file: ${{ github.event.inputs.solution_exported_folder}}/${{ github.event.inputs.solution_name }}.zip
+
 
     - name: unpack-solution action
       uses: microsoft/powerplatform-actions/unpack-solution@v0
@@ -69,14 +67,11 @@ jobs:
         solution-folder: ${{ github.event.inputs.solution_folder}}/${{ github.event.inputs.solution_name }}
         solution-type: 'Unmanaged'
         overwrite-files: true
-        
-    - name: Commit changes
-      run: |
-        cp -r ${{ github.event.inputs.solution_folder}}/${{ github.event.inputs.solution_name }} ./${{ github.event.inputs.solution_folder}}/${{ github.event.inputs.solution_name }} 
-        git config --global user.email "no-reply@github.com"
-        git config --global user.name "GitHub Actions"
-        git checkout main
-        git add --all 
-        git commit -m "Updates from the dev environment"
-        git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-        git push
+
+    - name: branch-solution, prepare it for a PullRequest
+      uses: microsoft/powerplatform-actions/branch-solution@v0
+      with:
+        solution-folder: ${{ github.event.inputs.solution_folder}}/${{ github.event.inputs.solution_name }}
+        solution-target-folder: ${{ github.event.inputs.solution_target_folder}}/${{ github.event.inputs.solution_name }}
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        allow-empty-commit: true
